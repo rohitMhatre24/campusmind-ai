@@ -1,89 +1,9 @@
 import React, { useState } from "react";
-import API from "../api/api";
+import API, { errorMessage } from "../api/api";
+import { Icon } from "../App";
 
-function StudyPlanner() {
-  const [input, setInput] = useState("");
-  const [plan, setPlan] = useState(null);
-
-  const generatePlan = async () => {
-    if (!input.trim()) return;
-
-    try {
-      const response = await API.post("/study-plan/generate", {
-        message: input,
-      });
-
-      console.log("API Response:", response.data);
-
-      setPlan(response.data.plan);
-
-    } catch (error) {
-      console.error(error);
-      alert("Failed to generate study plan");
-    }
-  };
-
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2>AI Study Planner 📚</h2>
-
-      {/* Input */}
-      <input
-        type="text"
-        placeholder="e.g. I have exams in 5 days"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        style={{ width: "70%", padding: "8px" }}
-      />
-
-      <button onClick={generatePlan} style={{ marginLeft: "10px" }}>
-        Generate
-      </button>
-
-      <br /><br />
-
-      {/* Output */}
-      {plan && (
-        <div>
-          <h3>Your Study Plan</h3>
-
-          {/* ✅ CASE 1: If backend returns ARRAY */}
-          {Array.isArray(plan) &&
-            plan.map((item, index) => (
-              <div
-                key={index}
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "10px",
-                  marginBottom: "10px",
-                  borderRadius: "8px",
-                }}
-              >
-                <strong>{item.day}</strong>
-                <p>{item.task}</p>
-              </div>
-            ))}
-
-          {/* ✅ CASE 2: If backend returns OBJECT */}
-          {!Array.isArray(plan) &&
-            Object.entries(plan).map(([day, task]) => (
-              <div
-                key={day}
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "10px",
-                  marginBottom: "10px",
-                  borderRadius: "8px",
-                }}
-              >
-                <strong>{day.toUpperCase()}</strong>
-                <p>{task}</p>
-              </div>
-            ))}
-        </div>
-      )}
-    </div>
-  );
+const prompts=["I have exams coming up in two weeks","Help me balance classes and assignments","I need a focused plan for this weekend"];
+export default function StudyPlanner(){const [input,setInput]=useState("");const [plan,setPlan]=useState(null);const [busy,setBusy]=useState(false);const [error,setError]=useState("");
+  async function generate(value=input){if(!value.trim()||busy)return;setBusy(true);setError("");setPlan(null);try{const {data}=await API.post("/study-plan/generate",{message:value.trim()});setPlan(data.plan);}catch(err){setError(errorMessage(err,"Couldn’t create your study plan. Please try again."));}finally{setBusy(false);}}
+  return <div className="page-enter"><div className="page-heading"><div><div className="eyebrow">MAKE SPACE TO FOCUS</div><h1>Your study planner</h1><p>Share what’s on your plate and get a practical plan made for your week.</p></div><span className="online-pill"><Icon name="spark" size={15}/> AI powered</span></div><div className="planner-layout"><section className="planner-prompt-card"><span className="planner-big-icon"><Icon name="book" size={24}/></span><div className="card-kicker">START WITH WHAT YOU HAVE</div><h2>What are you working toward?</h2><p>Tell us about upcoming exams, deadlines, or the time you have available.</p><label className="visually-hidden" htmlFor="planner-prompt">Describe what you need to study</label><textarea id="planner-prompt" value={input} onChange={e=>setInput(e.target.value)} rows={5} placeholder="For example: I have exams in 10 days for biology and statistics, plus two assignments due next week…"/><div className="prompt-footer"><span>{input.length>0?`${input.length} characters`:"A little context makes a better plan"}</span><button className="button primary" onClick={()=>generate()} disabled={busy||!input.trim()}>{busy?<><span className="button-spinner"/> Planning…</>:<>Build my plan <Icon name="arrow" size={17}/></>}</button></div>{error&&<div className="alert error" role="alert"><Icon name="alert" size={17}/>{error}</div>}</section><aside className="planner-aside"><div className="aside-note planner-note"><span className="aside-note-icon"><Icon name="spark"/></span><h3>Start with a simple prompt</h3><p>You don’t need a perfect schedule. Just share what’s coming up, and we’ll help you find a good first step.</p></div><div className="prompt-examples"><div className="card-kicker">NEED AN IDEA?</div>{prompts.map(p=><button key={p} onClick={()=>{setInput(p);generate(p);}}>{p}<Icon name="arrow" size={14}/></button>)}</div></aside></div>{busy&&<div className="plan-loading"><span className="spinner"/><div><strong>Putting your plan together</strong><p>Finding a manageable rhythm for your goals…</p></div></div>}{plan&&<section className="plan-results"><div className="section-heading"><div><div className="eyebrow">A PLAN THAT FITS YOUR GOALS</div><h2>Your study plan</h2></div><span className="count-pill">{plan.length} {plan.length===1?"day":"days"}</span></div><div className="plan-grid">{plan.map((item,index)=><article className="plan-day" key={`${item.day}-${index}`}><span className="day-number">{String(item.day).padStart(2,"0")}</span><div><span className="day-label">DAY {item.day}</span><p>{item.task}</p></div><span className="plan-check"><Icon name="check" size={15}/></span></article>)}</div></section>}</div>;
 }
-
-export default StudyPlanner;

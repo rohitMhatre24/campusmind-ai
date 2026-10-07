@@ -1,60 +1,17 @@
 import React, { useState } from "react";
-import API from "../api/api";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import API, { errorMessage } from "../api/api";
+import { useAuth } from "../App";
+import { Icon } from "../App";
 
-function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const navigate = useNavigate();
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-
-    try {
-      const response = await API.post("/auth/login", {
-        email,
-        password,
-      });
-
-      // Save token
-      localStorage.setItem("token", response.data.access_token);
-
-      alert("Login successful");
-
-      // Redirect to dashboard
-      navigate("/dashboard");
-
-    } catch (error) {
-      alert("Invalid credentials");
-    }
-  };
-
-  return (
-    <div style={{ padding: "50px" }}>
-      <h2>Login</h2>
-
-      <form onSubmit={handleLogin}>
-        <input
-          type="email"
-          placeholder="Enter email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <br /><br />
-
-        <input
-          type="password"
-          placeholder="Enter password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <br /><br />
-
-        <button type="submit">Login</button>
-      </form>
-    </div>
-  );
+export default function Login() {
+  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const { setUser } = useAuth(); const navigate = useNavigate(); const location = useLocation();
+  async function submit(event) {
+    event.preventDefault(); setError(""); setBusy(true);
+    try { const {data} = await API.post("/auth/login", {email, password}); localStorage.setItem("token", data.access_token); const profile = await API.get("/protected/me"); setUser(profile.data); navigate(location.state?.from || "/dashboard", {replace:true}); }
+    catch (err) { localStorage.removeItem("token"); setError(errorMessage(err, "We couldn’t sign you in. Check your details and try again.")); }
+    finally { setBusy(false); }
+  }
+  return <main className="login-page"><div className="login-top"><div className="brand"><span className="brand-mark"><Icon name="spark" size={21}/></span><span>campus<span className="brand-light">mind</span><small>STUDENT SUPPORT, SIMPLIFIED</small></span></div><span className="login-top-note">Your campus, a little more connected.</span></div><section className="login-layout"><div className="login-intro"><div className="eyebrow"><span className="eyebrow-star">✳</span> YOUR CAMPUS, IN ONE PLACE</div><h1>Make campus<br/><span>work better</span><i> for you.</i></h1><p>Get help, keep track of campus issues, and make room for your next big idea.</p><div className="login-highlights"><div><span className="highlight-icon"><Icon name="check" size={17}/></span><span>Report it once. Follow every update.</span></div><div><span className="highlight-icon"><Icon name="spark" size={17}/></span><span>Get thoughtful help, any time.</span></div></div><div className="login-orbit"><div className="orbit-center"><Icon name="spark" size={28}/></div><span className="orbit-node node-one">✳</span><span className="orbit-node node-two">⌂</span><span className="orbit-node node-three">✓</span></div></div><div className="login-card"><div className="login-card-heading"><span className="card-kicker">WELCOME BACK</span><h2>Sign in to CampusMind</h2><p>Enter your campus account details to continue.</p></div><form onSubmit={submit} className="form-stack"><label htmlFor="email">Email address</label><input id="email" type="email" autoComplete="username" placeholder="you@yourcampus.edu" value={email} onChange={e=>setEmail(e.target.value)} required/><label htmlFor="password">Password</label><input id="password" type="password" autoComplete="current-password" placeholder="Enter your password" value={password} onChange={e=>setPassword(e.target.value)} required minLength={1}/>{error && <div className="alert error" role="alert"><Icon name="alert" size={17}/>{error}</div>}<button className="button primary login-submit" disabled={busy}>{busy ? <><span className="button-spinner"/> Signing you in…</> : <>Sign in <Icon name="arrow" size={17}/></>}</button></form><div className="login-divider"><span/> SECURE CAMPUS ACCESS <span/></div><p className="login-footnote">Need an account? Ask your college administrator to set one up.</p></div></section><div className="login-footer">A calmer campus starts here <span>·</span> © CampusMind AI</div></main>;
 }
-
-export default Login;

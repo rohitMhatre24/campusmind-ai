@@ -1,71 +1,9 @@
-import React, { useState } from "react";
-import API from "../api/api";
+import React, { useEffect, useRef, useState } from "react";
+import API, { errorMessage } from "../api/api";
+import { Icon } from "../App";
 
-function Chatbot() {
-  const [message, setMessage] = useState("");
-  const [chat, setChat] = useState([]);
-
-  const sendMessage = async () => {
-    if (!message.trim()) return;
-
-    // Add user message to chat
-    const newChat = [...chat, { sender: "user", text: message }];
-    setChat(newChat);
-
-    try {
-      const response = await API.post("/chatbot/ask", {
-        message: message,
-      });
-
-      // Add bot response
-      setChat([
-        ...newChat,
-        { sender: "bot", text: response.data.reply },
-      ]);
-
-    } catch (error) {
-      setChat([
-        ...newChat,
-        { sender: "bot", text: "Error fetching response" },
-      ]);
-    }
-
-    setMessage("");
-  };
-
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2>Campus Chatbot 🤖</h2>
-
-      {/* Chat Box */}
-      <div
-        style={{
-          border: "1px solid #ccc",
-          height: "400px",
-          overflowY: "scroll",
-          padding: "10px",
-          marginBottom: "10px",
-        }}
-      >
-        {chat.map((msg, index) => (
-          <div key={index}>
-            <strong>{msg.sender}:</strong> {msg.text}
-          </div>
-        ))}
-      </div>
-
-      {/* Input */}
-      <input
-        type="text"
-        placeholder="Ask something..."
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        style={{ width: "70%" }}
-      />
-
-      <button onClick={sendMessage}>Send</button>
-    </div>
-  );
+const suggestions=["How do I report a campus issue?","Help me plan my study week","Where can I get student support?"];
+export default function Chatbot(){const [messages,setMessages]=useState([{role:"assistant",text:"Hi there! I’m your CampusMind assistant. Ask me about campus support, reporting an issue, or getting organized with your studies."}]);const [text,setText]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const bottom=useRef(null);useEffect(()=>bottom.current?.scrollIntoView({behavior:"smooth"}),[messages,busy]);
+  async function send(value=text){const prompt=value.trim();if(!prompt||busy)return;setError("");setText("");setMessages(list=>[...list,{role:"user",text:prompt}]);setBusy(true);try{const {data}=await API.post("/chatbot/ask",{message:prompt});setMessages(list=>[...list,{role:"assistant",text:data.reply}]);}catch(err){setError(errorMessage(err,"The assistant couldn’t reply just now. Please try again."));}finally{setBusy(false);}}
+  return <div className="page-enter"><div className="page-heading"><div><div className="eyebrow">HERE WHEN YOU NEED A HAND</div><h1>Campus assistant</h1><p>Quick answers and a little guidance, whenever you need it.</p></div><div className="online-pill"><span className="status-dot"/> AI assistant</div></div><section className="chat-panel"><div className="chat-header"><div className="chat-avatar"><Icon name="spark" size={20}/></div><div><strong>CampusMind assistant</strong><span><i/> Ready to help</span></div><span className="chat-header-tag">CAMPUS SUPPORT</span></div><div className="chat-stream" aria-live="polite">{messages.map((msg,index)=><div key={index} className={`message-row ${msg.role}`}><div className="message-avatar">{msg.role==="assistant"?<Icon name="spark" size={16}/>:"Y"}</div><div className="message-body"><span className="message-name">{msg.role==="assistant"?"CampusMind":"You"}</span><div className="message-bubble">{msg.text}</div></div></div>)}{busy&&<div className="message-row assistant"><div className="message-avatar"><Icon name="spark" size={16}/></div><div className="message-body"><span className="message-name">CampusMind</span><div className="message-bubble typing"><i/><i/><i/></div></div></div>}<div ref={bottom}/></div>{error&&<div className="chat-error" role="alert">{error} <button onClick={()=>send(messages.at(-1)?.role==="user"?messages.at(-1).text:"")}>Retry</button></div>}{messages.length===1&&<div className="suggestions"><span>TRY ASKING</span>{suggestions.map(item=><button key={item} onClick={()=>send(item)}>{item}<Icon name="arrow" size={14}/></button>)}</div>}<form className="chat-compose" onSubmit={e=>{e.preventDefault();send();}}><label className="visually-hidden" htmlFor="chat-message">Message the campus assistant</label><input id="chat-message" value={text} onChange={e=>setText(e.target.value)} placeholder="Ask anything about campus…" disabled={busy}/><button className="button primary" disabled={!text.trim()||busy} aria-label="Send message">{busy?<span className="button-spinner"/>:<Icon name="arrow" size={18}/>}</button></form><div className="chat-disclaimer">CampusMind can make mistakes. For urgent matters, contact your campus team directly.</div></section></div>;
 }
-
-export default Chatbot;

@@ -1,58 +1,28 @@
-import React, { useEffect, useState } from "react";
-import API from "../api/api";
-import { useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import API, { errorMessage } from "../api/api";
+import { useAuth, Icon } from "../App";
 
-function Dashboard() {
-  const [issues, setIssues] = useState([]);
-  const navigate = useNavigate();
-
-  // Fetch issues when page loads
-  useEffect(() => {
-    fetchIssues();
-  }, []);
-
-  const fetchIssues = async () => {
-    try {
-      const response = await API.get("/issues");
-      setIssues(response.data);
-    } catch (error) {
-      console.error(error);
-      alert("Failed to load issues");
-    }
-  };
-
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2>Dashboard - Issues</h2>
-        <button onClick={() => navigate("/create-issue")}>
-            Create Issue
-        </button>
-        <button onClick={() => navigate("/chatbot")}>
-            Open Chatbot
-        </button>
-        <button onClick={() => navigate("/study-planner")}>
-            Study Planner
-        </button>
-      {issues.length === 0 ? (
-        <p>No issues found</p>
-      ) : (
-        issues.map((issue) => (
-          <div
-            key={issue.id}
-            style={{
-              border: "1px solid #ccc",
-              padding: "10px",
-              marginBottom: "10px",
-            }}
-          >
-            <h4>{issue.title}</h4>
-            <p>{issue.description}</p>
-            <p>Status: {issue.status}</p>
-          </div>
-        ))
-      )}
-    </div>
-  );
+const statusLabel = (status) => (status || "pending").replaceAll("_", " ");
+function IssueCard({ issue, admin, onStatus }) {
+  return <article className="issue-card"><div className="issue-card-main"><div className="issue-mark"><Icon name="alert" size={18}/></div><div className="issue-info"><div className="issue-title-row"><h3>{issue.title}</h3><span className={`badge status-${statusLabel(issue.status).replaceAll(" ", "-")}`}>{statusLabel(issue.status)}</span></div><p>{issue.description}</p><div className="issue-meta"><span>Issue #{issue.id}</span><span>·</span><span>{issue.created_at ? new Date(issue.created_at).toLocaleDateString() : "Recently reported"}</span></div></div></div>{issue.image_url && <a className="issue-image-link" href={`${API.defaults.baseURL}${issue.image_url.startsWith("/") ? "" : "/"}${issue.image_url}`} target="_blank" rel="noreferrer">View attachment <Icon name="arrow" size={14}/></a>}{admin && <select aria-label={`Update status for ${issue.title}`} value={issue.status} onChange={e=>onStatus(issue.id,e.target.value)} className="status-select"><option value="pending">Pending</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option></select>}</article>;
 }
 
-export default Dashboard;
+export default function Dashboard() {
+  const {user} = useAuth(); const admin = ["college_admin", "super_admin"].includes(user?.role);
+  const [issues,setIssues]=useState([]); const [categories,setCategories]=useState([]); const [loading,setLoading]=useState(true); const [error,setError]=useState(""); const [query,setQuery]=useState(""); const [category,setCategory]=useState(""); const [page,setPage]=useState(1); const [hasMore,setHasMore]=useState(false); const PAGE_SIZE=10;
+  const load = useCallback(async () => { setLoading(true); setError(""); try { const categoryRequest = API.get("/categories/").catch(()=>({data:[]})); const [result, cats] = await Promise.all([admin ? (query.trim() ? API.get("/issues/search",{params:{keyword:query.trim()}}) : category ? API.get("/issues/filter",{params:{category_id:category}}) : API.get("/issues/paginated",{params:{page,limit:PAGE_SIZE}})) : API.get("/issues/my-issues"), categoryRequest]); setIssues(result.data); setCategories(cats.data); if(admin && !query.trim() && !category) setHasMore(result.data.length === PAGE_SIZE); } catch(err) { setError(errorMessage(err,"Couldn’t load campus issues.")); } finally { setLoading(false); } },[admin,query,category,page]);
+  useEffect(()=>{load();},[load]);
+  async function updateStatus(id,status){try{await API.put(`/issues/${id}/status`,{status});setIssues(items=>items.map(item=>item.id===id?{...item,status}:item));}catch(err){setError(errorMessage(err,"Couldn’t update the issue status."));}}
+  const counts={total:issues.length,open:issues.filter(i=>["open","in_progress"].includes(i.status)).length,resolved:issues.filter(i=>i.status==="resolved").length};
+  return <div className="page-enter"><div className="page-heading"><div><div className="eyebrow">{admin?"CAMPUS OPERATIONS":"YOUR CAMPUS"}</div><h1>{admin?"Issue overview":"Good to see you, "}<span>{admin?"":""}{!admin?(user?.name||"there").split(" ")[0]:""}</span></h1><p>{admin?"A clearer view of what needs attention across your campus.":"Here’s what’s happening with your campus reports."}</p></div><Link className="button primary" to="/report"><Icon name="plus" size={17}/> Report an issue</Link></div>
+    {admin && <div className="stats-grid"><div className="stat-card"><span className="stat-icon stat-blue"><Icon name="grid"/></span><span className="stat-label">Issues shown</span><strong>{loading?"—":counts.total}</strong><small>In this view</small></div><div className="stat-card"><span className="stat-icon stat-amber"><Icon name="alert"/></span><span className="stat-label">Needs attention</span><strong>{loading?"—":counts.open}</strong><small>Open or in progress</small></div><div className="stat-card"><span className="stat-icon stat-green"><Icon name="check"/></span><span className="stat-label">Resolved</span><strong>{loading?"—":counts.resolved}</strong><small>In this view</small></div><div className="stat-note"><div className="stat-note-icon"><Icon name="spark" size={19}/></div><strong>Small fixes add up.</strong><p>Every update helps students feel heard and supported.</p></div></div>}
+    <section className="section-panel"><div className="section-heading"><div><h2>{admin?"Recent campus issues":"Your reported issues"}</h2><p>{admin?"Review, filter, and update issue status.":"Updates to the issues you’ve reported will appear here."}</p></div>{!admin&&<span className="count-pill">{issues.length} {issues.length===1?"report":"reports"}</span>}</div>
+      <div className="toolbar">{admin&&<><div className="search-field"><Icon name="search" size={17}/><input value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}} placeholder="Search issues…" aria-label="Search issues"/></div><select className="filter-select" value={category} onChange={e=>{setCategory(e.target.value);setPage(1);}} aria-label="Filter by category"><option value="">All categories</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></>}</div>
+      {error&&<div className="alert error" role="alert"><Icon name="alert" size={17}/>{error}<button className="text-button" onClick={load}>Try again</button></div>}
+      {loading?<div className="issue-list">{[1,2,3].map(i=><div className="skeleton-row" key={i}><span/><div><i/><i/><i/></div></div>)}</div>:issues.length===0&&!error?<div className="empty-state"><div className="empty-icon"><Icon name={query||category?"search":"spark"} size={23}/></div><h3>{query||category?"No matching issues":"Nothing to report yet"}</h3><p>{query||category?"Try another search or category filter.":admin?"There are no issues to review right now.":"If something needs attention, let your campus know."}</p>{!admin&&<Link className="button secondary" to="/report">Create your first report <Icon name="arrow" size={16}/></Link>}</div>:<div className="issue-list">{issues.map(issue=><IssueCard key={issue.id} issue={issue} admin={admin} onStatus={updateStatus}/>)}</div>}
+      {admin&&!loading&&!query.trim()&&!category&&<div className="pagination"><span>Page {page}</span><div><button className="button secondary small" disabled={page===1} onClick={()=>setPage(v=>Math.max(1,v-1))}>Previous</button><button className="button secondary small" disabled={!hasMore} onClick={()=>setPage(v=>v+1)}>Next</button></div></div>}
+    </section>
+    {!admin&&<div className="quick-links"><Link to="/assistant"><span className="quick-icon quick-violet"><Icon name="chat"/></span><span><strong>Ask the campus assistant</strong><small>Find quick answers to campus questions</small></span><Icon name="arrow" size={17}/></Link><Link to="/planner"><span className="quick-icon quick-green"><Icon name="book"/></span><span><strong>Make a study plan</strong><small>Turn a busy week into a clear plan</small></span><Icon name="arrow" size={17}/></Link></div>}
+  </div>;
+}

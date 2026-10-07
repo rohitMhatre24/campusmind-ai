@@ -1,16 +1,20 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://127.0.0.1:8001"
+  baseURL: process.env.REACT_APP_API_URL || "http://127.0.0.1:8001",
+  timeout: 30000,
 });
 
-// Add token automatically
-API.interceptors.request.use((req) => {
+API.interceptors.request.use((request) => {
   const token = localStorage.getItem("token");
-  if (token) {
-    req.headers.Authorization = `Bearer ${token}`;
-  }
-  return req;
+  if (token) request.headers.Authorization = `Bearer ${token}`;
+  return request;
 });
+
+export function errorMessage(error, fallback = "Something went wrong. Please try again.") {
+  const detail = error?.response?.data?.detail;
+  if (Array.isArray(detail)) return detail.map((item) => item.msg).join(" · ");
+  return detail || error?.response?.data?.message || error?.message || fallback;
+}
 
 export default API;

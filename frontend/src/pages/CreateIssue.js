@@ -1,104 +1,11 @@
-import React, { useState, useEffect } from "react";
-import API from "../api/api";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import API, { errorMessage } from "../api/api";
+import { Icon } from "../App";
 
-function CreateIssue() {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [image, setImage] = useState(null);
-  const [categories, setCategories] = useState([]);
-
-  const navigate = useNavigate();
-
-  // Fetch categories
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
-    try {
-      const res = await API.get("/categories");
-      setCategories(res.data);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to load categories");
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const formData = new FormData();
-
-      formData.append("title", title);
-      formData.append("description", description);
-      formData.append("category_id", categoryId);
-
-      if (image) {
-        formData.append("image", image);
-      }
-
-      await API.post("/issues", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      alert("Issue created successfully");
-
-      navigate("/dashboard");
-
-    } catch (error) {
-      console.error(error);
-      alert("Failed to create issue");
-    }
-  };
-
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2>Create Issue</h2>
-
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <br /><br />
-
-        <textarea
-          placeholder="Description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        <br /><br />
-
-        <select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-        >
-          <option value="">Select Category</option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))}
-        </select>
-        <br /><br />
-
-        <input
-          type="file"
-          onChange={(e) => setImage(e.target.files[0])}
-        />
-        <br /><br />
-
-        <button type="submit">Submit</button>
-      </form>
-    </div>
-  );
+export default function CreateIssue(){
+  const [categories,setCategories]=useState([]); const [loading,setLoading]=useState(true); const [error,setError]=useState(""); const [title,setTitle]=useState(""); const [description,setDescription]=useState(""); const [category,setCategory]=useState(""); const [image,setImage]=useState(null); const [busy,setBusy]=useState(false); const [success,setSuccess]=useState(false); const input=useRef(null); const navigate=useNavigate();
+  useEffect(()=>{API.get("/categories/").then(({data})=>setCategories(data)).catch(err=>setError(errorMessage(err,"Couldn’t load issue categories."))).finally(()=>setLoading(false));},[]);
+  async function submit(e){e.preventDefault();setError("");setBusy(true);try{const body=new FormData();body.append("title",title.trim());body.append("description",description.trim());body.append("category_id",category);if(image)body.append("image",image);await API.post("/issues/",body);setSuccess(true);setTimeout(()=>navigate("/dashboard"),1300);}catch(err){setError(errorMessage(err,"Couldn’t submit your report."));}finally{setBusy(false);}}
+  return <div className="page-enter"><div className="breadcrumb-back"><Link to="/dashboard">← Back to overview</Link></div><div className="page-heading compact-heading"><div><div className="eyebrow">CAMPUS CARE</div><h1>Report an issue</h1><p>Tell us what needs attention. We’ll make sure the right people see it.</p></div></div><div className="form-page-layout"><section className="form-card"><div className="form-card-title"><span className="large-icon"><Icon name="plus" size={21}/></span><div><h2>Issue details</h2><p>Fields marked with * are required</p></div></div>{success?<div className="success-panel"><span><Icon name="check" size={22}/></span><h3>Your report is on its way</h3><p>Thanks for helping make campus better. Taking you back to your reports…</p></div>:<form className="form-stack issue-form" onSubmit={submit}><label htmlFor="issue-title">What’s the issue? <span>*</span></label><input id="issue-title" value={title} onChange={e=>setTitle(e.target.value)} maxLength={120} placeholder="e.g. Projector not working in room 204" required/><div className="field-hint">A short, clear title helps us understand the problem.</div><label htmlFor="issue-category">Category <span>*</span></label><select id="issue-category" value={category} onChange={e=>setCategory(e.target.value)} required disabled={loading||categories.length===0}><option value="">{loading?"Loading categories…":categories.length?"Choose a category":"No categories available"}</option>{categories.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>{!loading&&!categories.length&&!error&&<div className="field-hint">Your campus administrator needs to add categories before reports can be submitted.</div>}<label htmlFor="issue-description">Tell us a little more <span>*</span></label><textarea id="issue-description" value={description} onChange={e=>setDescription(e.target.value)} maxLength={2000} rows={5} placeholder="Where did it happen? What were you doing? Any details that could help?" required/><div className="field-hint char-count">{description.length}/2000 characters</div><label>Photo or screenshot <span className="optional">OPTIONAL</span></label><button type="button" className={`upload-box ${image?"has-file":""}`} onClick={()=>input.current?.click()} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const file=e.dataTransfer.files?.[0];if(file?.type.startsWith("image/"))setImage(file);}}><span className="upload-icon"><Icon name="plus" size={20}/></span><strong>{image?image.name:"Add an image"}</strong><span>{image?"Click to choose a different file":"Click to browse or drag a file here · JPG, PNG, WEBP"}</span></button><input ref={input} className="visually-hidden" type="file" accept="image/*" aria-label="Attach an image" onChange={e=>setImage(e.target.files?.[0]||null)}/>{image&&<button type="button" className="remove-file" onClick={()=>{setImage(null);if(input.current)input.current.value="";}}><Icon name="close" size={14}/> Remove attachment</button>}{error&&<div className="alert error" role="alert"><Icon name="alert" size={17}/>{error}</div>}<div className="form-actions"><Link className="button secondary" to="/dashboard">Cancel</Link><button className="button primary" disabled={busy||loading||!categories.length}>{busy?<><span className="button-spinner"/> Sending…</>:<>Submit report <Icon name="arrow" size={17}/></>}</button></div></form>}</section><aside className="form-aside"><div className="aside-note"><span className="aside-note-icon"><Icon name="spark"/></span><h3>It starts with speaking up.</h3><p>Your report helps your campus team notice patterns, respond sooner, and make things better for everyone.</p></div><div className="privacy-note"><span className="privacy-icon">✓</span><p><strong>Your report stays within your campus.</strong> Our team uses your details only to help resolve the issue.</p></div></aside></div></div>;
 }
-
-export default CreateIssue;
